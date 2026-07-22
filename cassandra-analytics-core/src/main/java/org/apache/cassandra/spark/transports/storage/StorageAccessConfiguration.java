@@ -21,9 +21,6 @@ package org.apache.cassandra.spark.transports.storage;
 
 import java.util.Objects;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -102,31 +99,5 @@ public class StorageAccessConfiguration
                + ", bucket='" + bucket + '\''
                + ", auth='" + storageAuth + '\''
                + '}';
-    }
-
-    public static class Serializer extends com.esotericsoftware.kryo.Serializer<StorageAccessConfiguration>
-    {
-        @Override
-        public void write(Kryo kryo, Output out, StorageAccessConfiguration object)
-        {
-            out.writeString(object.region);
-            out.writeString(object.bucket);
-            String authType = object.storageAuth instanceof IamStorageAuth ? "IAM" : "STATIC";
-            out.writeString(authType);
-            if (!"IAM".equals(authType))
-            {
-                kryo.writeObject(out, (StorageCredentials) object.storageAuth);
-            }
-        }
-
-        @Override
-        public StorageAccessConfiguration read(Kryo kryo, Input in, Class<StorageAccessConfiguration> type)
-        {
-            String region = in.readString();
-            String bucket = in.readString();
-            String authType = in.readString();
-            StorageAuth auth = "IAM".equals(authType) ? IamStorageAuth.INSTANCE : kryo.readObject(in, StorageCredentials.class);
-            return new StorageAccessConfiguration(region, bucket, auth);
-        }
     }
 }

@@ -20,13 +20,9 @@
 package org.apache.cassandra.spark.transports.storage.extensions;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
 import org.apache.cassandra.spark.bulkwriter.cloudstorage.coordinated.MultiClusterContainer;
 import org.apache.cassandra.spark.transports.storage.StorageAccessConfiguration;
 import org.apache.cassandra.spark.transports.storage.StorageCredentialPair;
@@ -146,25 +142,5 @@ public class StorageTransportConfiguration
     public int hashCode()
     {
         return Objects.hash(prefix, objectTags, writeAccessConfiguration, readAccessConfigurations);
-    }
-
-    public static class Serializer extends com.esotericsoftware.kryo.Serializer<StorageTransportConfiguration>
-    {
-        public void write(Kryo kryo, Output out, StorageTransportConfiguration obj)
-        {
-            out.writeString(obj.prefix);
-            kryo.writeObject(out, obj.objectTags);
-            kryo.writeObject(out, obj.writeAccessConfiguration);
-            kryo.writeObject(out, obj.readAccessConfigurations);
-        }
-
-        @SuppressWarnings("unchecked")
-        public StorageTransportConfiguration read(Kryo kryo, Input in, Class<StorageTransportConfiguration> type)
-        {
-            return new StorageTransportConfiguration(in.readString(),
-                                                     kryo.readObject(in, HashMap.class),
-                                                     kryo.readObject(in, StorageAccessConfiguration.class),
-                                                     kryo.readObject(in, MultiClusterContainer.class));
-        }
     }
 }

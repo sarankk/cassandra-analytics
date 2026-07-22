@@ -21,9 +21,6 @@ package org.apache.cassandra.spark.transports.storage;
 
 import java.util.Objects;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
@@ -147,24 +144,5 @@ public class StorageCredentials implements StorageAuth
     public int hashCode()
     {
         return Objects.hash(accessKeyId, secretKey, sessionToken);
-    }
-
-    public static class Serializer extends com.esotericsoftware.kryo.Serializer<StorageCredentials>
-    {
-        public void write(Kryo kryo, Output out, StorageCredentials obj)
-        {
-            out.writeString(obj.accessKeyId);
-            out.writeString(obj.secretKey);
-            out.writeString(obj.sessionToken);
-        }
-
-        public StorageCredentials read(Kryo kryo, Input input, Class<StorageCredentials> type)
-        {
-            return new StorageCredentials(
-            input.readString(),
-            input.readString(),
-            input.readString()
-            );
-        }
     }
 }

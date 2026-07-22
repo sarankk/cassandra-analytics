@@ -30,9 +30,6 @@ import com.esotericsoftware.kryo.Kryo;
 import org.apache.cassandra.spark.bulkwriter.BulkWriterConfig;
 import org.apache.cassandra.spark.bulkwriter.RingInstance;
 import org.apache.cassandra.spark.bulkwriter.TokenPartitioner;
-import org.apache.cassandra.spark.transports.storage.StorageAccessConfiguration;
-import org.apache.cassandra.spark.transports.storage.StorageCredentials;
-import org.apache.cassandra.spark.transports.storage.extensions.StorageTransportConfiguration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.serializer.KryoRegistrator;
 import org.jetbrains.annotations.NotNull;
@@ -70,9 +67,6 @@ public class SbwKryoRegistrator implements KryoRegistrator
         javaSerializableClasses.stream()
                                .sorted(Comparator.comparing(Class::getCanonicalName))
                                .forEach(javaSerializableClass -> kryo.register(javaSerializableClass, new SbwJavaSerializer()));
-        kryo.register(StorageTransportConfiguration.class, new StorageTransportConfiguration.Serializer());
-        kryo.register(StorageAccessConfiguration.class, new StorageAccessConfiguration.Serializer());
-        kryo.register(StorageCredentials.class, new StorageCredentials.Serializer());
     }
 
     public static void addJavaSerializableClass(@NotNull Class<?> javaSerializableClass)
