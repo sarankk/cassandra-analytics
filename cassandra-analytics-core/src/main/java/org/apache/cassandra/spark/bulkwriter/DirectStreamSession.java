@@ -247,7 +247,7 @@ public class DirectStreamSession extends StreamSession<TransportContext.DirectDa
         recordStreamedFile(componentFile);
     }
 
-    private List<CommitResult> commit(DirectStreamResult streamResult) throws ExecutionException, InterruptedException
+    protected List<CommitResult> commit(DirectStreamResult streamResult) throws ExecutionException, InterruptedException
     {
         try (CommitCoordinator cc = CommitCoordinator.commit(writerContext, transportContext, streamResult))
         {

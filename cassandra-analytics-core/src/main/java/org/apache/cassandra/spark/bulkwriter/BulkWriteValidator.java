@@ -20,6 +20,7 @@
 package org.apache.cassandra.spark.bulkwriter;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +77,48 @@ public class BulkWriteValidator
             logger.error(message);
             throw new ConsistencyNotSatisfiedException(message);
         }
+    }
+
+    /**
+     * Validates bulk write success for a tracked keyspace, where Analytics only uploads and imports to a single
+     * coordinator replica per token range (see {@link TrackedDirectStreamSession}).
+     * <p>
+     * Unlike {@link #validateClOrFail}, this does not evaluate the requested consistency level against the number of
+     * succeeded replicas -- Cassandra's coordinated transfer takes care of that internally once the coordinator
+     * accepts the import. Analytics only needs to confirm the upload and commit to the single chosen coordinator
+     * succeeded; if it did not, the range failed and should be retried (picking a new coordinator candidate, since
+     * failed instances are excluded from selection on retry).
+     *
+     * @param tokenRange    the token range that was streamed to a single coordinator
+     * @param streamErrors  upload failures recorded for this stream session
+     * @param commitResults commit results returned for the coordinator
+     * @param logger        logger to use
+     * @param phase         write phase, used in error messages
+     * @param job           the job being run
+     */
+    public static void validateTrackedKeyspaceCL(Range<BigInteger> tokenRange,
+                                                 List<StreamError> streamErrors,
+                                                 List<CommitResult> commitResults,
+                                                 Logger logger,
+                                                 String phase,
+                                                 JobInfo job)
+    {
+        List<String> failureMessages = new ArrayList<>();
+        streamErrors.forEach(error -> failureMessages.add(
+        String.format("upload to %s failed: %s", error.instance.nodeName(), error.errMsg)));
+        commitResults.forEach(commitResult -> commitResult.failures.forEach((uuid, err) -> failureMessages.add(
+        String.format("commit on %s failed: %s", commitResult.instance.nodeName(), err.errMsg))));
+
+        if (failureMessages.isEmpty())
+        {
+            logger.info("Succeeded {} for tracked keyspace range {} for job {}", phase, tokenRange, job.getId());
+            return;
+        }
+
+        String message = String.format("Failed to write tracked keyspace range %s for job %s in phase %s. %s",
+                                       tokenRange, job.getId(), phase, failureMessages);
+        logger.error(message);
+        throw new ConsistencyNotSatisfiedException(message);
     }
 
     public String getPhase()
