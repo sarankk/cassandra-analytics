@@ -96,12 +96,12 @@ public class BulkWriteValidator
      * @param phase         write phase, used in error messages
      * @param job           the job being run
      */
-    public static void validateTrackedKeyspaceCL(Range<BigInteger> tokenRange,
-                                                 List<StreamError> streamErrors,
-                                                 List<CommitResult> commitResults,
-                                                 Logger logger,
-                                                 String phase,
-                                                 JobInfo job)
+    public static void validateTrackedWriteOrFail(Range<BigInteger> tokenRange,
+                                                  List<StreamError> streamErrors,
+                                                  List<CommitResult> commitResults,
+                                                  Logger logger,
+                                                  String phase,
+                                                  JobInfo job)
     {
         List<String> failureMessages = new ArrayList<>();
         streamErrors.forEach(error -> failureMessages.add(
