@@ -46,6 +46,9 @@ public class KryoRegisterTest
 
         assertThat(KryoRegister.KRYO_REGISTRATORS.get(CassandraVersion.FIVEZERO))
         .isEqualTo(KryoRegister.V50.class);
+
+        assertThat(KryoRegister.KRYO_REGISTRATORS.get(CassandraVersion.SIXZERO))
+        .isEqualTo(KryoRegister.V60.class);
     }
 
     @Test
