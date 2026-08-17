@@ -79,7 +79,7 @@ public enum CassandraVersion
             // Cassandra 6.0 native sstable versions
             "big-pa",
             "bti-ea",
-            }, 60);
+            }, 40);
 
     private final int number;
     private final String name;
