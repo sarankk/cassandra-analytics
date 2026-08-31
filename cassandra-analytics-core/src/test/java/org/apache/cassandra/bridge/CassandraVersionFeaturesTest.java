@@ -43,6 +43,18 @@ public class CassandraVersionFeaturesTest
         testCassandraVersion("qwerty-cassandra-4.0-SNAPSHOT", 40, 0, "SNAPSHOT");
     }
 
+    @Test
+    public void testPreReleaseVersions()
+    {
+        testCassandraVersion("6.0-alpha2", 60, 0, "alpha2");
+        testCassandraVersion("cassandra-6.0-alpha1", 60, 0, "alpha1");
+        testCassandraVersion("cassandra-6.0-alpha2", 60, 0, "alpha2");
+        testCassandraVersion("cassandra-6.0-beta1", 60, 0, "beta1");
+        testCassandraVersion("cassandra-6.0-rc1", 60, 0, "rc1");
+        testCassandraVersion("cassandra-6.0-alpha", 60, 0, "alpha");
+        testCassandraVersion("qwerty-cassandra-6.0-alpha2", 60, 0, "alpha2");
+    }
+
     @Test()
     public void testInvalidInput()
     {

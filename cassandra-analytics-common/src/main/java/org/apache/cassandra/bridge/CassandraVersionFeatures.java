@@ -33,6 +33,8 @@ public class CassandraVersionFeatures implements Comparable<CassandraVersionFeat
     private static final Pattern VERSION_PATTERN_3        = Pattern.compile("(?:.+-)?([0-9]+)\\.([0-9]+)\\.([0-9]+)([a-zA-Z0-9-]*)");
     private static final Pattern VERSION_PATTERN_4        = Pattern.compile("(?:.+-)?([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.([0-9]+)[a-zA-Z0-9-]*");
     private static final Pattern VERSION_PATTERN_SNAPSHOT = Pattern.compile("(?:.+-)?([0-9]+)\\.([0-9]+)-(SNAPSHOT)$");
+    // Pre-release builds are numbered, e.g. cassandra-6.0-alpha2, cassandra-6.0-beta1, cassandra-6.0-rc1
+    private static final Pattern VERSION_PATTERN_PRE_RELEASE = Pattern.compile("(?:.+-)?([0-9]+)\\.([0-9]+)-((?:alpha|beta|rc)[0-9]*)$");
 
     protected final int majorVersion;
     protected final int minorVersion;
@@ -80,10 +82,11 @@ public class CassandraVersionFeatures implements Comparable<CassandraVersionFeat
 
     // E.g if cassandra version = cassandra-1.2.11-v1, we return 11;
     //  or if cassandra version = cassandra-4.0-SNAPSHOT, we return 0
+    //  or if cassandra version = cassandra-6.0-alpha2, we return 0
     private static String getCassandraMinorVersionCode(String cassandraVersion)
     {
         Matcher matcher = matchVersion(cassandraVersion);
-        if (matchesSnapshot(matcher.group(3)))
+        if (!microVersion(matcher))
         {
             return "0";
         }
@@ -94,15 +97,26 @@ public class CassandraVersionFeatures implements Comparable<CassandraVersionFeat
     // E.g if cassandra version = cassandra-1.2.11-v1, we return -v1;
     //  or if cassandra version = cassandra-1.2.11.2-tag, we return 2;
     //  or if cassandra version = cassandra-4.0-SNAPSHOT, we return SNAPSHOT
+    //  or if cassandra version = cassandra-6.0-alpha2, we return alpha2
     private static String getCassandraVersionSuffix(String cassandraVersion)
     {
         Matcher matcher = matchVersion(cassandraVersion);
-        if (matchesSnapshot(matcher.group(3)) || matchesSnapshot(matcher.group(4)))
+        if (!microVersion(matcher))
+        {
+            return matchesSnapshot(matcher.group(3)) ? "SNAPSHOT" : matcher.group(3);
+        }
+
+        if (matchesSnapshot(matcher.group(4)))
         {
             return "SNAPSHOT";
         }
 
         return matcher.group(4);
+    }
+
+    private static boolean microVersion(Matcher matcher)
+    {
+        return matcher.groupCount() > 3;
     }
 
     private static boolean matchesSnapshot(String snapshot)
@@ -126,8 +140,14 @@ public class CassandraVersionFeatures implements Comparable<CassandraVersionFeat
                 matcher = VERSION_PATTERN_SNAPSHOT.matcher(cassandraVersion);
                 if (!matcher.find())
                 {
-                    throw new RuntimeException("cassandraVersion does not match version pattern, pattern=" + VERSION_PATTERN_3
-                                                                                            + ", version=" + cassandraVersion);
+                    matcher = VERSION_PATTERN_PRE_RELEASE.matcher(cassandraVersion);
+                    if (!matcher.find())
+                    {
+                        throw new RuntimeException("cassandraVersion does not match any version pattern, patterns=["
+                                                   + VERSION_PATTERN_3 + ", " + VERSION_PATTERN_4 + ", "
+                                                   + VERSION_PATTERN_SNAPSHOT + ", " + VERSION_PATTERN_PRE_RELEASE
+                                                   + "], version=" + cassandraVersion);
+                    }
                 }
             }
         }
