@@ -106,7 +106,9 @@ public class TrackedDirectStreamSession extends DirectStreamSession
         RingInstance coordinator = pickCoordinator(candidates);
         LOGGER.info("[{}]: Selected {} as coordinator for tracked range {} out of {} candidates",
                     sessionID, coordinator.nodeName(), tokenRange, candidates.size());
-        return Collections.singletonList(coordinator);
+        List<RingInstance> replicas = new ArrayList<>();
+        replicas.add(coordinator);
+        return replicas;
     }
 
     /**
