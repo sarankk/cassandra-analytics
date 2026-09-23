@@ -105,7 +105,8 @@ class SSTableWriterImplementationTest
         String sstableFormat = format.name();
         assertThat(sstableFormat).containsAnyOf("big", "bti");
         String sstableVersion = format.getLatestVersion().version;
-        assertThat(sstableVersion).isEqualTo("bti".equals(sstableFormat) ? "ea" : "pa");
+        // The cep-45-mutation-tracking pin of cassandra-all bumped these from big-pa and bti-ea
+        assertThat(sstableVersion).isEqualTo("bti".equals(sstableFormat) ? "eb" : "pb");
         int firstGeneration = lowestGeneration(produced);
         assertThat(produced.stream().map(e -> e.baseFilename)).containsExactlyInAnyOrder(
             toSStableFileName(sstableFormat, sstableVersion, firstGeneration),

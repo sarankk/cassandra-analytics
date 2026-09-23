@@ -89,10 +89,45 @@ dependencies {
         // kafka-avro-serializer is only needed when sidecar publishes CDC events to a
         // Schema-Registry-backed Kafka topic, which our in-jvm integration tests do not exercise.
         exclude(group: 'io.confluent')
-        // Sidecar pulls in a published cassandra-analytics-core whose _spark<N>_<scala> artifactId
-        // does not match project.name, so Gradle cannot dedupe it against the local project and a
-        // stale copy of every class lingers on the classpath.
-        exclude(group: 'org.apache.cassandra', module: 'cassandra-analytics-core_spark3_2.12')
+        // Sidecar declares runtime dependencies on *published* artifacts of this very repo. A project
+        // dependency's identity is project.group + project.name, never archivesBaseName, and
+        // gradle/common/publishing-spark.gradle appends _spark<N>_<scala> to archivesBaseName - so the
+        // published artifactIds match no project.name here, Gradle cannot dedupe them against the local
+        // projects, and a stale copy of every class sits on the test classpath next to the locally built
+        // output. Either copy can win class loading (IntelliJ orders entries differently from Gradle),
+        // so recent changes silently vanish at integration-test runtime with no warning at build time.
+        //
+        // The suffix records the Spark/Scala profile *sidecar* was published with, not the one we build
+        // against, so it cannot be derived from sparkLabel/scalaMajorVersion - a computed suffix matches
+        // nothing and fails silently. Hardcode it.
+        //
+        // cassandra-analytics-common needs no exclude: it publishes unsuffixed, so its coordinates match
+        // the local project and Gradle resolves the conflict in favour of the project.
+        //
+        // Excluding alone is not enough. Sidecar's own code loads these classes - SidecarModules.all()
+        // reaches org.apache.cassandra.cdc.sidecar.ClusterConfigProvider during startup - so dropping the
+        // published jars without putting the local equivalents on the classpath yields
+        // NoClassDefFoundError. The matching project(...) dependencies are declared below; keep the two
+        // lists in step. A scan of sidecar-server-1.0.0-analytics.jar (794 classes) shows it references
+        // org/apache/cassandra/{bridge,cdc/**,spark/data,spark/utils}, owned by cassandra-bridge,
+        // cassandra-analytics-{cdc,cdc-codec,cdc-sidecar,common} and cassandra-avro-converter.
+        ['cassandra-analytics-core',
+         'cassandra-analytics-cdc',
+         'cassandra-analytics-cdc-codec',
+         'cassandra-analytics-cdc-sidecar',
+         'cassandra-analytics-spark-converter',
+         'cassandra-avro-converter',
+         'cassandra-bridge'].each { module ->
+            exclude(group: 'org.apache.cassandra', module: "${module}_spark3_2.12")
+        }
     }
+    // The local counterparts of the artifacts excluded above, so Sidecar's CDC wiring resolves against
+    // the code under test. cassandra-bridge, cassandra-analytics-common and
+    // cassandra-analytics-spark-converter already arrive transitively through
+    // project(':cassandra-analytics-core'), which the test project depends on directly.
+    api(project(':cassandra-analytics-cdc'))
+    api(project(':cassandra-analytics-cdc-codec'))
+    api(project(':cassandra-analytics-cdc-sidecar'))
+    api(project(':cassandra-avro-converter'))
     api(group: 'org.apache.cassandra', name: 'sidecar-server-common', version: "${sidecarVersion}")
 }
