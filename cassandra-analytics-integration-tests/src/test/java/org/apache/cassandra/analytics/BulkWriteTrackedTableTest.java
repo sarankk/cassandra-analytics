@@ -24,16 +24,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.vdurmont.semver4j.Semver;
-import org.apache.cassandra.distributed.api.ConsistencyLevel;
+import org.apache.cassandra.distributed.api.Feature;
 import org.apache.cassandra.distributed.api.IInstance;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.sidecar.testing.QualifiedName;
 import org.apache.cassandra.testing.ClusterBuilderConfiguration;
-import org.apache.cassandra.testing.TestUtils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -42,7 +39,6 @@ import static org.apache.cassandra.testing.TestUtils.CREATE_TEST_TABLE_STATEMENT
 import static org.apache.cassandra.testing.TestUtils.DC1_RF3;
 import static org.apache.cassandra.testing.TestUtils.ROW_COUNT;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
 /**
  * Tests bulk writes to a table in a keyspace with mutation tracking enabled, i.e. a keyspace created with
@@ -84,7 +80,16 @@ class BulkWriteTrackedTableTest extends SharedClusterSparkIntegrationTestBase
     protected ClusterBuilderConfiguration testClusterConfiguration()
     {
         ClusterBuilderConfiguration conf = super.testClusterConfiguration()
-                                                .nodesPerDc(3);
+                                                .nodesPerDc(3)
+                                                // A tracked import does not just add the SSTables locally: it hands
+                                                // them to MutationTrackingService.executeTransfers, which streams them
+                                                // to every replica of the range over a real internode connection
+                                                // (TrackedImportTransfer -> StreamPlan -> NettyStreamingConnectionFactory).
+                                                // Streaming does not go through the in-JVM message sink, so without
+                                                // NETWORK the instances never bind their storage port and every
+                                                // transfer fails with "Connection refused", surfacing at the Sidecar
+                                                // as an unrelated NotSerializableException (see StreamSummary.tableId).
+                                                .requestFeature(Feature.NETWORK);
         // Preserve the base instance config (e.g. storage_compatibility_mode) and enable mutation tracking, without
         // which CREATE KEYSPACE ... replication_type = 'tracked' is rejected. The journal directory is configured
         // per-instance by the in-jvm dtest InstanceConfig.
