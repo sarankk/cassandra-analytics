@@ -40,29 +40,13 @@ import org.apache.cassandra.spark.bulkwriter.token.ReplicaAwareFailureHandler;
  * Stream session for bulk writes to keyspaces with mutation tracking enabled.
  *
  * <p>
- * Cassandra's coordinated transfer: import can be triggered on any one of the token range's write replicas, and that
- * node then streams the data to the rest of the range's replicas and enforces the requested consistency level
- * internally (see {@code TrackedImportTransfer}, which streams to itself before propagating to its peers). This is unlike a direct write, where Analytics
- * uploads and imports on every replica independently, which would cause duplicate row updates for tracked keyspaces
- * once each replica's coordinated transfer kicks in.
+ * Unlike bulk write to untracked keyspaces, for tracked keyspaces Cassandra's coordinates SSTable transfer between
+ * nodes for bulk import. Import can be triggered on any one of the replica's of a token range and that replica acts as
+ * a coordinator. {@link TrackedDirectStreamSession} spreads the coordinator pick across the eligible candidates of a
+ * range so that outgoing connections are distributed across the nodes in Cassandra.
  * <p>
- * {@code TrackedDirectStreamSession} therefore uploads and imports to a <em>single</em> replica per token range
- * instead of all of them. It reuses {@link DirectStreamSession}'s upload/cleanup machinery unchanged, and only
- * differs in:
- * <ul>
- *     <li>{@link #getReplicas()} — selects one replica instead of all of them, spreading the pick across the
- *     eligible candidates by range so that different token ranges (and therefore different Spark tasks) prefer
- *     different nodes rather than funneling every range through the same one</li>
- *     <li>{@link #doFinalizeStream()} — validates success against the single chosen replica rather than the
- *     replica-count-based consistency check {@link DirectStreamSession} uses, since Cassandra's coordinated
- *     transfer -- not Analytics -- is responsible for satisfying the consistency level across the rest of the range</li>
- * </ul>
- * <p>
- * Resiliency to coordinator failure mid-session (e.g. immediately retrying a different replica without failing the
- * whole task) is not handled here; a failed upload/import is surfaced as a {@link org.apache.cassandra.spark.exception.ConsistencyNotSatisfiedException}
- * and relies on Spark's task-level retry to pick a new session (and therefore a new coordinator candidate, since
- * failed instances are excluded from selection). See the mutation tracking writer support design doc, Phase 2, for
- * further resiliency work (topology changes, in-session failover, etc).
+ * Write validation now moves to Cassandra in place of analytics checking consistency level. Resiliency to coordinator
+ * failure mid-session is not handled here; it is handled at Spark's task-level retry.
  */
 public class TrackedDirectStreamSession extends DirectStreamSession
 {
@@ -81,11 +65,8 @@ public class TrackedDirectStreamSession extends DirectStreamSession
     }
 
     /**
-     * Selects a single replica to act as the coordinator for this token range.
-     * <p>
-     * The pick is deterministic for a given range, but varies from range to range, so that coordinator load is spread
-     * across the eligible replicas rather than always landing on e.g. the first replica returned by Sidecar for every
-     * range.
+     * Selects a single replica to act as the coordinator for this token range. The pick varies from range to range, so
+     * that coordinator load is spread across replicas.
      */
     @Override
     List<RingInstance> getReplicas()
@@ -146,10 +127,7 @@ public class TrackedDirectStreamSession extends DirectStreamSession
         }
         streamResult.setCommitResults(commitResults);
         LOGGER.debug("[{}]: Tracked StreamResult: {}", sessionID, streamResult);
-
-        // Cassandra's coordinated transfer enforces the requested consistency level internally once the coordinator
-        // accepts the import; Analytics only needs to confirm the single coordinator it uploaded/imported to succeeded.
-        BulkWriteValidator.validateTrackedKeyspaceCL(tokenRange, errors, commitResults, LOGGER, WRITE_PHASE, writerContext.job());
+        BulkWriteValidator.validateCoordinatorWriteSucceeded(tokenRange, errors, commitResults, LOGGER, WRITE_PHASE, writerContext.job());
         return streamResult;
     }
 }
